@@ -1,0 +1,7 @@
+# Prebuilt cross-compiled binaries in Architecture: all package
+arch-independent-package-contains-binary-or-object
+missing-dependency-on-libc
+unstripped-binary-or-object
+no-manual-page
+pkg-config-unavailable-for-cross-compilation
+script-with-language-extension

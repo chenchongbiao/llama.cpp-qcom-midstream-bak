@@ -8,32 +8,48 @@ pre_build_dep:
 	sudo apt-get install -y --no-install-recommends docker.io
 
 .PHONY: main_build
-main_build: build-qcom
+main_build: build-midstream
 
-# ===== Qualcomm Snapdragon (Hexagon DSP) =====
-PKG_QCOM       := llama.cpp-qcom
-BUILD_QCOM     := $(SRC_DIR)/build-qcom
-INSTALL_QCOM   := $(SRC_DIR)/install-qcom
-DOCKER_QCOM    := ghcr.io/snapdragon-toolchain/arm64-linux:v0.1
+# ===== Radxa Q6A/Q8B (OpenCL GPU, mainline kernel) =====
+PKG_MIDSTREAM   := llama.cpp-qcom-midstream
+BUILD_MIDSTREAM := $(SRC_DIR)/build-midstream
+INSTALL_MIDSTREAM := $(SRC_DIR)/install-midstream
+DOCKER_MIDSTREAM := arm64v8/ubuntu:24.04
+OPENCL_TARBALL  := qcom-adreno_1.838.3_qcm6490.tar.gz
+OPENCL_URL      := https://softwarecenter.qualcomm.com/nexus/generic/software/chip/qualcomm_linux-spf-1-0/qualcomm-linux-spf-1-0_test_device_public/r1.0_00114.0/le-qclinux-1-0-r1/apps_proc/prebuilt_HY22/qcom-adreno/251215/$(OPENCL_TARBALL)
 
-.PHONY: build-qcom
-build-qcom:
-	cp $(SRC_DIR)/docs/backend/snapdragon/CMakeUserPresets.json $(SRC_DIR)/
-	sed -i 's/"version": 5/"version": 4/' $(SRC_DIR)/CMakeUserPresets.json
-	# Create container and copy source (docker cp avoids Docker-in-Docker volume mount issue)
-	docker create --name qcom-build --platform linux/amd64 $(DOCKER_QCOM) \
+.PHONY: build-midstream
+build-midstream:
+	docker create --name midstream-build --platform linux/arm64 $(DOCKER_MIDSTREAM) \
 		/bin/bash -c ' \
 			set -euo pipefail; \
+			apt-get update && apt-get install -y --no-install-recommends \
+				cmake ninja-build g++ opencl-headers wget ca-certificates python3; \
+			wget -q "$(OPENCL_URL)" -O /tmp/$(OPENCL_TARBALL); \
+			mkdir -p /tmp/qcm6490; \
+			tar xzf /tmp/$(OPENCL_TARBALL) -C /tmp/qcm6490; \
+			cp /tmp/qcm6490/usr/lib/libOpenCL.so.1 /usr/lib/; \
+			ln -sf libOpenCL.so.1 /usr/lib/libOpenCL.so; \
 			cd /workspace; \
-			cmake --preset arm64-linux-snapdragon-release -B build-qcom; \
-			cmake --build build-qcom -j $$(nproc); \
-			cmake --install build-qcom --prefix install-qcom \
+			cmake -B build-midstream -G Ninja \
+				-DCMAKE_BUILD_TYPE=Release \
+				-DBUILD_SHARED_LIBS=OFF \
+				-DGGML_NATIVE=OFF \
+				-DGGML_OPENCL=ON \
+				-DGGML_OPENCL_USE_ADRENO_KERNELS=ON \
+				-DGGML_OPENCL_EMBED_KERNELS=ON \
+				-DGGML_HEXAGON=OFF \
+				-DGGML_OPENCL_TARGET_VERSION=200 \
+				-DOpenCL_LIBRARY=/usr/lib/libOpenCL.so \
+				-DOpenCL_INCLUDE_DIR=/usr/include; \
+			cmake --build build-midstream -j $$(nproc); \
+			cmake --install build-midstream --prefix install-midstream \
 		'
-	docker cp $(SRC_DIR)/. qcom-build:/workspace/
-	docker start -a qcom-build
-	rm -rf $(INSTALL_QCOM)
-	docker cp qcom-build:/workspace/install-qcom/. $(INSTALL_QCOM)/
-	docker rm qcom-build
-	rm -rf $(PKG_QCOM)
-	mkdir -p $(PKG_QCOM)/usr
-	cp -a $(INSTALL_QCOM)/* $(PKG_QCOM)/usr/
+	docker cp $(SRC_DIR)/. midstream-build:/workspace/
+	docker start -a midstream-build
+	rm -rf $(INSTALL_MIDSTREAM)
+	docker cp midstream-build:/workspace/install-midstream/. $(INSTALL_MIDSTREAM)/
+	docker rm midstream-build
+	rm -rf $(PKG_MIDSTREAM)
+	mkdir -p $(PKG_MIDSTREAM)/usr
+	cp -a $(INSTALL_MIDSTREAM)/* $(PKG_MIDSTREAM)/usr/

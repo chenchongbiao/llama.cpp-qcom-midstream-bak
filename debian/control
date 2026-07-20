@@ -1,4 +1,4 @@
-Source: llama.cpp
+Source: llama.cpp-qcom-midstream
 Maintainer: "Radxa Computer Co., Ltd" <dev@radxa.com>
 Section: admin
 Priority: standard
@@ -9,13 +9,15 @@ Build-Depends: debhelper-compat (= 13),
                lintian,
                dh-exec,
                pandoc,
+               docker.io,
+               python3,
 
-Package: llama.cpp-qcom
+Package: llama.cpp-qcom-midstream
 Architecture: all
 Section: admin
 Priority: optional
 Depends: ${misc:Depends},
-         fastrpc,
-Description: llama.cpp for Qualcomm Snapdragon
- llama.cpp with Hexagon DSP backend for Qualcomm Snapdragon devices.
-
+         qcom-adreno-opencl,
+         python3,
+Description: llama.cpp for Qualcomm mainline (OpenCL GPU)
+ llama.cpp with OpenCL GPU backend for Qualcomm mainline-kernel devices.

@@ -17,9 +17,11 @@
 /*.changes
 /.pc
 
-# Output folder
-/out
+/llama.cpp-qcom-midstream
+
+# Build artifacts in src/
+/src/build-midstream/
+/src/install-midstream/
 
 # Logs
 /*.log
-
